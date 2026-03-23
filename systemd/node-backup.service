@@ -1,0 +1,23 @@
+[Unit]
+Description=Node backup to remote restic repository
+After=network-online.target
+Wants=network-online.target
+Requires=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/default/node-backup
+Environment=HOME=/root
+ExecStartPre=/usr/bin/install -d -m 755 -o root -g root ${RESTIC_CACHE_DIR}
+ExecStart=/usr/bin/bash -lc '/usr/local/lib/node-backup/backup.sh'
+KillSignal=SIGINT
+TimeoutStopSec=120
+Nice=19
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+CPUQuota=75%
+SyslogLevel=info
+LogRateLimitIntervalSec=0
+
+[Install]
+WantedBy=multi-user.target

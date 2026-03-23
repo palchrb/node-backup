@@ -1,0 +1,6 @@
+[Unit]
+Description=Send webhook on node backup failure
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash -lc '/usr/local/lib/node-backup/notify.sh'

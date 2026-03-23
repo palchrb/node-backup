@@ -1,0 +1,5 @@
+/var/cache
+/tmp
+/var/tmp
+/lost+found
+/home/ubuntu/.cache
