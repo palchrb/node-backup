@@ -62,21 +62,17 @@ fi
 # -----------------------------------------------------------------------------
 # 6. Read schedule from the installed config (or fall back to env.example defaults)
 # -----------------------------------------------------------------------------
-# Source whichever file is available to get schedule variables
+# Source whichever file is available. The env file contains only variable
+# assignments and is safe to source directly — the same mechanism used by the
+# backup scripts at runtime via lib.sh:load_env().
 _env_source=/etc/default/node-backup
 [[ -f "$_env_source" ]] || _env_source="$SCRIPT_DIR/env.example"
+# shellcheck disable=SC1090
+source "$_env_source"
 
-# Extract schedule values without fully sourcing the file (avoids side-effects)
-_get_var() {
-  local var="$1" default="$2" file="$3"
-  local val
-  val="$(grep -E "^${var}=" "$file" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '"' | tr -d "'")" || true
-  echo "${val:-$default}"
-}
-
-BACKUP_SCHEDULE="$(_get_var BACKUP_SCHEDULE "*-*-* 03:30:00" "$_env_source")"
-BACKUP_SCHEDULE_JITTER="$(_get_var BACKUP_SCHEDULE_JITTER "20min" "$_env_source")"
-NOTIFY_SCHEDULE="$(_get_var NOTIFY_SCHEDULE "*-*-* 09:00:00" "$_env_source")"
+BACKUP_SCHEDULE="${BACKUP_SCHEDULE:-*-*-* 03:30:00}"
+BACKUP_SCHEDULE_JITTER="${BACKUP_SCHEDULE_JITTER:-20min}"
+NOTIFY_SCHEDULE="${NOTIFY_SCHEDULE:-*-*-* 09:00:00}"
 
 echo ">> Applying schedule:"
 echo "   BACKUP_SCHEDULE       = $BACKUP_SCHEDULE"
