@@ -1,6 +1,10 @@
 [Unit]
 Description=Send webhook on node backup failure
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=oneshot
+EnvironmentFile=/etc/default/node-backup
+Environment=HOME=/root
 ExecStart=/usr/bin/bash -lc '/usr/local/lib/node-backup/notify.sh'

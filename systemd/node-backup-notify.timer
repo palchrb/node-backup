@@ -2,7 +2,7 @@
 Description=Daily failure notification timer for node-backup
 
 [Timer]
-OnCalendar=09:00
+OnCalendar=%%NOTIFY_SCHEDULE%%
 Persistent=true
 
 [Install]
