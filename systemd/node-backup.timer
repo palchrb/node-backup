@@ -2,8 +2,8 @@
 Description=Nightly node backup timer
 
 [Timer]
-OnCalendar=03:30
-RandomizedDelaySec=20m
+OnCalendar=%%BACKUP_SCHEDULE%%
+RandomizedDelaySec=%%BACKUP_SCHEDULE_JITTER%%
 Persistent=true
 
 [Install]

@@ -1,5 +1,17 @@
+# node-backup — default exclusion patterns
+# One pattern per line. Standard restic glob syntax applies.
+# Lines starting with # are comments.
+# See: https://restic.readthedocs.io/en/stable/040_backup.html#excluding-files
+
+# System temp and cache directories
 /var/cache
 /tmp
 /var/tmp
 /lost+found
-/home/ubuntu/.cache
+
+# Common user cache directories
+/root/.cache
+/home/*/.cache
+
+# Restic's own cache (no value backing this up)
+/var/cache/restic

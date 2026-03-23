@@ -112,4 +112,15 @@ env \
   restic unlock >/dev/null 2>&1
 set -e
 
+if [[ -n "${POST_BACKUP_COMMAND:-}" ]]; then
+  log "Running post-backup command"
+  set +e
+  bash -lc "$POST_BACKUP_COMMAND"
+  post_rc=$?
+  set -e
+  if [[ $post_rc -ne 0 ]]; then
+    log "WARNING: post-backup command failed (rc=$post_rc)"
+  fi
+fi
+
 log "Backup complete"

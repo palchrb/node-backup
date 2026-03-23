@@ -19,7 +19,7 @@ read_status() {
 read -r STATE TS <<<"$(read_status "$STATUS_FILE")"
 
 if [[ "$STATE" == "OK" ]]; then
-  log "notify: backup OK @ $TS; no notification"
+  log "notify: backup OK @ $TS; no notification needed"
   exit 0
 fi
 
@@ -28,19 +28,19 @@ NODE_NAME="${NODE_BACKUP_NAME:-node-backup}"
 
 PAYLOAD="$(cat <<EOF_JSON
 {
-  \"service\": \"node-backup\",
-  \"node\": \"$NODE_NAME\",
-  \"host\": \"$HOSTNAME_FQDN\",
-  \"status\": \"$STATE\",
-  \"timestamp\": \"$TS\",
-  \"message\": \"Backup failed on $HOSTNAME_FQDN at $TS\"
+  "service": "node-backup",
+  "node": "$NODE_NAME",
+  "host": "$HOSTNAME_FQDN",
+  "status": "$STATE",
+  "timestamp": "$TS",
+  "message": "Backup failed on $HOSTNAME_FQDN at $TS"
 }
 EOF_JSON
 )"
 
 if [[ "${WEBHOOK_ENABLED:-0}" != "1" ]]; then
-  log "Webhook disabled; would have sent: $PAYLOAD"
-  exit 1
+  log "Webhook disabled; backup status is $STATE — would have sent: $PAYLOAD"
+  exit 0
 fi
 
 curl -fsS -X POST \
