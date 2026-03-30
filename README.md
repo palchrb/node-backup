@@ -152,6 +152,37 @@ restic restore latest --target /restore --include /var/backups/postgresql
 gunzip -c /restore/var/backups/postgresql/docker_myapp.sql.gz | docker exec -i myapp psql -U postgres
 ```
 
+### MariaDB / MySQL dumps
+
+`mariadb-dump-all.sh` works the same way for MariaDB and MySQL.
+
+**Enable** in `/etc/default/node-backup`:
+
+```bash
+# MariaDB only
+PRE_BACKUP_COMMAND='/usr/local/lib/node-backup/mariadb-dump-all.sh'
+
+# Both PostgreSQL and MariaDB
+PRE_BACKUP_COMMAND='/usr/local/lib/node-backup/pg-dump-all.sh && /usr/local/lib/node-backup/mariadb-dump-all.sh'
+```
+
+Bare metal connects as root via Unix socket (no password — `unix_socket` auth on default
+Debian/Ubuntu). Docker containers are detected by image name (`mariadb`, `mysql`) or
+`MYSQL_ROOT_PASSWORD` / `MARIADB_ROOT_PASSWORD` env vars; the root password is read from
+the container environment automatically.
+
+Dumps use `--single-transaction` for consistent InnoDB snapshots without table locks.
+
+**Restore:**
+
+```bash
+gunzip -c /var/backups/mariadb/local.sql.gz | mysql --user=root
+gunzip -c /var/backups/mariadb/docker_myapp.sql.gz | docker exec -i myapp mysql -u root --password=<pass>
+```
+
+Control variables: `MARIADB_DUMP_DIR`, `MARIADB_DUMP_LOCAL`, `MARIADB_DUMP_DOCKER`
+(same `auto` / `1` / `0` semantics as the PostgreSQL equivalents).
+
 ---
 
 ## Webhook notifications

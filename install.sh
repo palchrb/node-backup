@@ -34,10 +34,11 @@ install -d -m 755 /var/cache/restic
 # 3. Install scripts
 # -----------------------------------------------------------------------------
 echo ">> Installing scripts..."
-install -m 755 "$SCRIPT_DIR/scripts/backup.sh"      /usr/local/lib/node-backup/backup.sh
-install -m 755 "$SCRIPT_DIR/scripts/notify.sh"      /usr/local/lib/node-backup/notify.sh
-install -m 755 "$SCRIPT_DIR/scripts/pg-dump-all.sh" /usr/local/lib/node-backup/pg-dump-all.sh
-install -m 644 "$SCRIPT_DIR/scripts/lib.sh"         /usr/local/lib/node-backup/lib.sh
+install -m 755 "$SCRIPT_DIR/scripts/backup.sh"          /usr/local/lib/node-backup/backup.sh
+install -m 755 "$SCRIPT_DIR/scripts/notify.sh"          /usr/local/lib/node-backup/notify.sh
+install -m 755 "$SCRIPT_DIR/scripts/pg-dump-all.sh"     /usr/local/lib/node-backup/pg-dump-all.sh
+install -m 755 "$SCRIPT_DIR/scripts/mariadb-dump-all.sh" /usr/local/lib/node-backup/mariadb-dump-all.sh
+install -m 644 "$SCRIPT_DIR/scripts/lib.sh"             /usr/local/lib/node-backup/lib.sh
 
 # -----------------------------------------------------------------------------
 # 4. Install configuration file (only on first install — never overwrite)
