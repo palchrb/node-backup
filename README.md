@@ -106,15 +106,82 @@ Both are executed with `bash -lc "<command>"`.
 Examples:
 
 ```bash
-# Dump a MySQL database before backup
-PRE_BACKUP_COMMAND='mysqldump -u root --all-databases > /var/backups/mysql-all.sql'
+# Auto-dump all PostgreSQL databases (bare metal + Docker) — see section below
+PRE_BACKUP_COMMAND='/usr/local/lib/node-backup/pg-dump-all.sh'
 
-# Export data from a Docker container
-PRE_BACKUP_COMMAND='docker exec myapp /app/bin/export.sh'
-
-# Send a Slack success message after backup
-POST_BACKUP_COMMAND='/usr/local/bin/notify-slack-success.sh'
+# Send a healthcheck ping after a successful backup
+POST_BACKUP_COMMAND='curl -fsS https://hc-ping.com/your-uuid'
 ```
+
+---
+
+## PostgreSQL dumps
+
+`pg-dump-all.sh` is included for zero-config PostgreSQL backup. It auto-discovers
+and dumps every PostgreSQL instance on the node before each backup run.
+
+**What it finds:**
+- A local bare metal PostgreSQL install (via `pg_isready` + `pg_dumpall` as the `postgres` OS user)
+- Any running Docker container whose image name contains `postgres` or `postgis`, or
+  that has `POSTGRES_USER` / `POSTGRES_DB` / `POSTGRES_PASSWORD` environment variables
+
+**How to enable** in `/etc/default/node-backup`:
+
+```bash
+PRE_BACKUP_COMMAND='/usr/local/lib/node-backup/pg-dump-all.sh'
+BACKUP_PATHS="/etc /var/backups /srv/docker"   # /var/backups covers the dump dir
+```
+
+Dumps land in `PG_DUMP_DIR` (default `/var/backups/postgresql`) as `local.sql.gz` and
+`docker_<container-name>.sql.gz`. Each file is overwritten on every run — restic
+snapshots the state at each backup so versioning is handled automatically.
+
+Control the behaviour with three env vars (all default to `auto`):
+
+| Variable | `auto` | `1` | `0` |
+|---|---|---|---|
+| `PG_DUMP_LOCAL` | dump if postgres is running | always require | skip |
+| `PG_DUMP_DOCKER` | dump if docker is available | always require | skip |
+
+**Restore a dump:**
+
+```bash
+gunzip -c /var/backups/postgresql/local.sql.gz | sudo -u postgres psql
+# or from a restic snapshot:
+restic restore latest --target /restore --include /var/backups/postgresql
+gunzip -c /restore/var/backups/postgresql/docker_myapp.sql.gz | docker exec -i myapp psql -U postgres
+```
+
+### MariaDB / MySQL dumps
+
+`mariadb-dump-all.sh` works the same way for MariaDB and MySQL.
+
+**Enable** in `/etc/default/node-backup`:
+
+```bash
+# MariaDB only
+PRE_BACKUP_COMMAND='/usr/local/lib/node-backup/mariadb-dump-all.sh'
+
+# Both PostgreSQL and MariaDB
+PRE_BACKUP_COMMAND='/usr/local/lib/node-backup/pg-dump-all.sh && /usr/local/lib/node-backup/mariadb-dump-all.sh'
+```
+
+Bare metal connects as root via Unix socket (no password — `unix_socket` auth on default
+Debian/Ubuntu). Docker containers are detected by image name (`mariadb`, `mysql`) or
+`MYSQL_ROOT_PASSWORD` / `MARIADB_ROOT_PASSWORD` env vars; the root password is read from
+the container environment automatically.
+
+Dumps use `--single-transaction` for consistent InnoDB snapshots without table locks.
+
+**Restore:**
+
+```bash
+gunzip -c /var/backups/mariadb/local.sql.gz | mysql --user=root
+gunzip -c /var/backups/mariadb/docker_myapp.sql.gz | docker exec -i myapp mysql -u root --password=<pass>
+```
+
+Control variables: `MARIADB_DUMP_DIR`, `MARIADB_DUMP_LOCAL`, `MARIADB_DUMP_DOCKER`
+(same `auto` / `1` / `0` semantics as the PostgreSQL equivalents).
 
 ---
 
