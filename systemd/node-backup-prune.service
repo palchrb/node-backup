@@ -1,5 +1,5 @@
 [Unit]
-Description=Node backup to remote restic repository
+Description=Weekly restic prune for node-backup
 After=network-online.target
 Wants=network-online.target
 Requires=network-online.target
@@ -9,14 +9,14 @@ Type=oneshot
 EnvironmentFile=/etc/default/node-backup
 Environment=HOME=/root
 ExecStartPre=/usr/bin/install -d -m 755 -o root -g root ${RESTIC_CACHE_DIR}
-ExecStart=/usr/bin/bash -lc '/usr/local/lib/node-backup/backup.sh'
+ExecStart=/usr/bin/bash -lc '/usr/local/lib/node-backup/prune.sh'
 KillSignal=SIGINT
-TimeoutStopSec=120
+TimeoutStopSec=3600
 Nice=19
 IOSchedulingClass=best-effort
 IOSchedulingPriority=7
 CPUQuota=75%
-MemoryMax=%%BACKUP_MEMORY_MAX%%
+MemoryMax=%%PRUNE_MEMORY_MAX%%
 SyslogLevel=info
 LogRateLimitIntervalSec=0
 
