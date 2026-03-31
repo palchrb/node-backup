@@ -1,0 +1,9 @@
+[Unit]
+Description=Weekly restic prune timer for node-backup
+
+[Timer]
+OnCalendar=%%PRUNE_SCHEDULE%%
+Persistent=true
+
+[Install]
+WantedBy=timers.target

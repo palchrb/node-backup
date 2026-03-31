@@ -87,19 +87,19 @@ else
 fi
 
 if [[ ${#RET_ARGS[@]} -gt 0 ]]; then
-  log "Running forget --prune"
+  log "Running forget (prune runs separately on its own weekly timer)"
   set +e
   env \
     RESTIC_REPOSITORY="$RESTIC_REPOSITORY" \
     RESTIC_PASSWORD="$RESTIC_PASSWORD" \
     RESTIC_CACHE_DIR="$RESTIC_CACHE_DIR" \
     RCLONE_CONFIG="$RCLONE_CONFIG" \
-    restic forget --prune "${RET_ARGS[@]}"
-  prune_rc=$?
+    restic forget "${RET_ARGS[@]}"
+  forget_rc=$?
   set -e
 
-  if [[ $prune_rc -ne 0 ]]; then
-    log "WARNING: forget/prune failed (rc=$prune_rc)"
+  if [[ $forget_rc -ne 0 ]]; then
+    log "WARNING: forget failed (rc=$forget_rc)"
   fi
 fi
 
