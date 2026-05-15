@@ -18,3 +18,7 @@ load_env() {
 status_file_path() {
   echo "${STATUS_DIR:-/var/log/node-backup}/primary.status"
 }
+
+prune_status_file_path() {
+  echo "${STATUS_DIR:-/var/log/node-backup}/prune.status"
+}

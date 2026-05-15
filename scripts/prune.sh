@@ -14,6 +14,8 @@ set -euo pipefail
 source /usr/local/lib/node-backup/lib.sh
 load_env
 
+PRUNE_STATUS_FILE="$(prune_status_file_path)"
+
 log "Starting restic prune"
 set +e
 env \
@@ -26,8 +28,10 @@ prune_rc=$?
 set -e
 
 if [[ $prune_rc -ne 0 ]]; then
+  echo "FAIL $(date -Is) prune_rc=$prune_rc" > "$PRUNE_STATUS_FILE"
   log "ERROR: restic prune failed (rc=$prune_rc)"
   exit $prune_rc
 fi
 
+echo "OK $(date -Is) prune_rc=0" > "$PRUNE_STATUS_FILE"
 log "Prune complete"
