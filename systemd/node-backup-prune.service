@@ -11,7 +11,8 @@ Environment=HOME=/root
 ExecStartPre=/usr/bin/install -d -m 755 -o root -g root ${RESTIC_CACHE_DIR}
 ExecStart=/usr/bin/bash -lc '/usr/local/lib/node-backup/prune.sh'
 KillSignal=SIGINT
-TimeoutStopSec=3600
+TimeoutStartSec=%%PRUNE_TIMEOUT%%
+TimeoutStopSec=600
 Nice=19
 IOSchedulingClass=best-effort
 IOSchedulingPriority=7

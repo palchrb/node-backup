@@ -11,6 +11,7 @@ Environment=HOME=/root
 ExecStartPre=/usr/bin/install -d -m 755 -o root -g root ${RESTIC_CACHE_DIR}
 ExecStart=/usr/bin/bash -lc '/usr/local/lib/node-backup/backup.sh'
 KillSignal=SIGINT
+TimeoutStartSec=%%BACKUP_TIMEOUT%%
 TimeoutStopSec=120
 Nice=19
 IOSchedulingClass=best-effort
