@@ -5,7 +5,7 @@ A lightweight, easy-to-roll-out backup system for Linux servers using **restic**
 ## Features
 
 - Backs up chosen directories via `restic` to any `rclone`-supported backend
-- restic installed from the official GitHub release (SHA256-verified), pinnable per fleet
+- restic and rclone installed from their official releases (SHA256-verified), pinnable per fleet
 - Automatic `restic init` on first run — only when the repository genuinely does not exist
 - Configurable retention policy (daily / weekly / monthly)
 - Optional **pre-backup** and **post-backup** hooks — run any command or script
@@ -25,7 +25,7 @@ A lightweight, easy-to-roll-out backup system for Linux servers using **restic**
 git clone <your-repo-url> /opt/node-backup
 cd /opt/node-backup
 
-# 2. Run the installer (installs restic from GitHub, rclone, scripts, and systemd units)
+# 2. Run the installer (installs restic + rclone from official releases, scripts, systemd units)
 sudo ./install.sh
 
 # 3. Edit the configuration file
@@ -105,6 +105,7 @@ Key variables at a glance:
 | `STATUS_MAX_AGE_HOURS` | Alert if the last successful backup is older than this (`26`) |
 | `PRUNE_STATUS_MAX_AGE_HOURS` | Same for prune/check (`192` = 8 days) |
 | `RESTIC_VERSION` | restic release to install (`latest` or e.g. `0.18.0`) |
+| `RCLONE_VERSION` | rclone release to install (`latest` or e.g. `1.76.0`) |
 | `RESTIC_RETRY_LOCK` | How long to wait for a repository lock held by another job (`1h`) |
 | `NODE_BACKUP_NAME` | Node identifier included in webhook alerts |
 | `PRE_BACKUP_COMMAND` | Command to run before backup starts |
@@ -470,7 +471,7 @@ sudo ./install.sh
 ```
 
 Re-running the installer always updates the scripts, the systemd units and (with
-`RESTIC_VERSION="latest"`) restic itself. Schedules, memory limits and timeouts are
+`RESTIC_VERSION` / `RCLONE_VERSION` set to `latest`) restic and rclone themselves. Schedules, memory limits and timeouts are
 written into the systemd units at this point, so re-run it after changing those.
 
 It **never overwrites** `/etc/default/node-backup` or `/etc/node-backup-excludes.txt`.
@@ -502,10 +503,13 @@ sudo node-backup-restic restore <snapshot-id> --target /restore/old
 ## Requirements
 
 - Linux with systemd
-- Debian/Ubuntu (`install.sh` uses `apt-get` for `rclone`, `curl`, `bzip2`)
-- Network access to `github.com` during install — restic is downloaded from the official
-  release and verified against the release's `SHA256SUMS`. The distro `restic` package is
-  not used because it is often several versions behind (features such as `--retry-lock`
-  and exit code 10 for "repository does not exist" need a recent restic).
+- Debian/Ubuntu (`install.sh` uses `apt-get` for `curl`, `bzip2`, `unzip`)
+- Network access during install to `github.com` (restic) and `downloads.rclone.org`
+  (rclone). Both binaries are installed to `/usr/local/bin` and verified against the
+  release's `SHA256SUMS`. Distro packages are not used because they are often years
+  behind: features such as `--retry-lock` and exit code 10 for "repository does not
+  exist" need a recent restic, and cloud backends like Jottacloud get regular fixes in
+  rclone. If a distro package is also installed, `/usr/local/bin` takes precedence and
+  the installer tells you how to remove it.
 - A configured rclone remote for your chosen storage backend
 - `curl` (for webhook notifications)

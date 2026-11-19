@@ -21,11 +21,11 @@ echo
 # -----------------------------------------------------------------------------
 # 1. Install dependencies
 # -----------------------------------------------------------------------------
-echo ">> Installing dependencies (rclone, curl, bzip2)..."
+echo ">> Installing dependencies (curl, bzip2, unzip)..."
 apt-get update -q
-apt-get install -y rclone curl bzip2 ca-certificates
-# restic itself is installed from the official GitHub release in step 6b —
-# distro packages are often several versions behind.
+apt-get install -y curl bzip2 unzip ca-certificates
+# restic and rclone themselves are installed from their official release
+# downloads in step 6b — distro packages are often several years behind.
 
 # -----------------------------------------------------------------------------
 # 2. Create directories
@@ -87,6 +87,7 @@ PRUNE_MEMORY_MAX="${PRUNE_MEMORY_MAX:-2G}"
 BACKUP_TIMEOUT="${BACKUP_TIMEOUT:-12h}"
 PRUNE_TIMEOUT="${PRUNE_TIMEOUT:-24h}"
 RESTIC_VERSION="${RESTIC_VERSION:-latest}"
+RCLONE_VERSION="${RCLONE_VERSION:-latest}"
 
 # -----------------------------------------------------------------------------
 # 6b. Install restic from the official GitHub release (SHA256-verified)
@@ -117,7 +118,7 @@ install_restic() {
     return 0
   fi
 
-  echo ">> Installing restic $ver (${current:+upgrading from $current, }linux/$arch)..."
+  echo ">> Installing restic $ver (${current:+replacing $current, }linux/$arch)..."
   tmp="$(mktemp -d)"
   file="restic_${ver}_linux_${arch}.bz2"
   if ! curl -fsSL -o "$tmp/$file"      "https://github.com/restic/restic/releases/download/v${ver}/${file}" \
@@ -142,10 +143,69 @@ if ! install_restic; then
   fi
 fi
 
-if dpkg -s restic &>/dev/null; then
-  echo "NOTE: the distro 'restic' package is also installed (/usr/bin/restic)."
-  echo "      /usr/local/bin/restic takes precedence. Remove it with: apt-get remove restic"
+# -----------------------------------------------------------------------------
+# 6c. Install rclone from the official download site (SHA256-verified)
+# -----------------------------------------------------------------------------
+install_rclone() {
+  local arch ver current tmp file base
+  case "$(uname -m)" in
+    x86_64)        arch=amd64 ;;
+    aarch64|arm64) arch=arm64 ;;
+    armv7l)        arch=arm-v7 ;;
+    armv6l)        arch=arm ;;
+    i386|i686)     arch=386 ;;
+    *) echo "ERROR: unsupported architecture $(uname -m)"; return 1 ;;
+  esac
+
+  if [[ "$RCLONE_VERSION" == "latest" ]]; then
+    # version.txt contains e.g. "rclone v1.76.0"
+    ver="$(curl -fsSL https://downloads.rclone.org/version.txt)" || return 1
+    ver="${ver##*v}"
+  else
+    ver="${RCLONE_VERSION#v}"
+  fi
+  ver="$(echo "$ver" | tr -d '[:space:]')"
+  [[ "$ver" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "ERROR: could not determine rclone version (got '$ver')"; return 1; }
+
+  current="$(/usr/local/bin/rclone version 2>/dev/null | awk 'NR==1{print $2}')" || true
+  current="${current#v}"
+  if [[ "$current" == "$ver" ]]; then
+    echo ">> rclone $ver already installed"
+    return 0
+  fi
+
+  echo ">> Installing rclone $ver (${current:+replacing $current, }linux/$arch)..."
+  tmp="$(mktemp -d)"
+  base="rclone-v${ver}-linux-${arch}"
+  file="${base}.zip"
+  if ! curl -fsSL -o "$tmp/$file"      "https://downloads.rclone.org/v${ver}/${file}" \
+     || ! curl -fsSL -o "$tmp/SHA256SUMS" "https://downloads.rclone.org/v${ver}/SHA256SUMS"; then
+    rm -rf "$tmp"; echo "ERROR: download failed"; return 1
+  fi
+  if ! (cd "$tmp" && grep " ${file}\$" SHA256SUMS | sha256sum -c --quiet -); then
+    rm -rf "$tmp"; echo "ERROR: rclone checksum verification FAILED — not installing"; return 1
+  fi
+  unzip -q "$tmp/$file" -d "$tmp"
+  install -m 755 "$tmp/$base/rclone" /usr/local/bin/rclone
+  rm -rf "$tmp"
+  /usr/local/bin/rclone version | head -1
+}
+
+if ! install_rclone; then
+  if [[ -x /usr/local/bin/rclone ]]; then
+    echo "WARNING: rclone install/upgrade failed — keeping existing $(/usr/local/bin/rclone version | head -1)"
+  else
+    echo "ERROR: rclone could not be installed and none is present. Aborting."
+    exit 1
+  fi
 fi
+
+for pkg in restic rclone; do
+  if dpkg -s "$pkg" &>/dev/null; then
+    echo "NOTE: the distro '$pkg' package is also installed (/usr/bin/$pkg)."
+    echo "      /usr/local/bin/$pkg takes precedence. Remove it with: apt-get remove $pkg"
+  fi
+done
 
 echo ">> Applying configuration:"
 echo "   BACKUP_SCHEDULE        = $BACKUP_SCHEDULE"
