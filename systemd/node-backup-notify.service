@@ -8,3 +8,4 @@ Type=oneshot
 EnvironmentFile=/etc/default/node-backup
 Environment=HOME=/root
 ExecStart=/usr/bin/bash -lc '/usr/local/lib/node-backup/notify.sh'
+TimeoutStartSec=5min

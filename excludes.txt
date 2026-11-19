@@ -3,15 +3,54 @@
 # Lines starting with # are comments.
 # See: https://restic.readthedocs.io/en/stable/040_backup.html#excluding-files
 
-# System temp and cache directories
-/var/cache
+# =============================================================================
+# Virtual and kernel filesystems — never meaningful to back up
+# =============================================================================
+/proc
+/sys
+/dev
+/run
+
+# =============================================================================
+# System temp and cache
+# =============================================================================
 /tmp
 /var/tmp
+/var/cache
 /lost+found
 
-# Common user cache directories
+# =============================================================================
+# Swap — large, zero restore value
+# =============================================================================
+/swapfile
+/swap.img
+*.swap
+
+# =============================================================================
+# User cache directories
+# =============================================================================
 /root/.cache
 /home/*/.cache
 
-# Restic's own cache (no value backing this up)
+# =============================================================================
+# Docker — image layers and container logs are large and regenerable
+# The overlay2 directory holds all image layer data and can be many GB.
+# Named volumes and bind mounts in your BACKUP_PATHS are still captured.
+# Container logs grow unboundedly and have no restore value.
+# =============================================================================
+/var/lib/docker/overlay2
+/var/lib/docker/aufs
+/var/lib/docker/btrfs
+/var/lib/docker/zfs
+/var/lib/docker/tmp
+/var/lib/docker/containers/*/log
+
+# =============================================================================
+# Restic's own cache
+# =============================================================================
 /var/cache/restic
+
+# =============================================================================
+# Common regenerable build artifacts
+# =============================================================================
+node_modules

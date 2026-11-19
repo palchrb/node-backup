@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# node-backup-restic — run any restic command against this node's repository,
+# using the settings in /etc/default/node-backup.
+#
+# Examples:
+#   sudo node-backup-restic snapshots
+#   sudo node-backup-restic ls latest /etc
+#   sudo node-backup-restic restore latest --target /restore/test --include /etc/nginx
+#   sudo node-backup-restic check
+set -euo pipefail
+
+if [[ $EUID -ne 0 ]]; then
+  echo "Run as root: sudo $(basename "$0") $*" >&2
+  exit 1
+fi
+
+# shellcheck disable=SC1091
+source /usr/local/lib/node-backup/lib.sh
+load_env
+
+restic_cmd "$@"

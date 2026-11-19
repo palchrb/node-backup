@@ -21,9 +21,11 @@ echo
 # -----------------------------------------------------------------------------
 # 1. Install dependencies
 # -----------------------------------------------------------------------------
-echo ">> Installing dependencies (restic, rclone, curl)..."
+echo ">> Installing dependencies (rclone, curl, bzip2)..."
 apt-get update -q
-apt-get install -y restic rclone curl
+apt-get install -y rclone curl bzip2 ca-certificates
+# restic itself is installed from the official GitHub release in step 6b —
+# distro packages are often several versions behind.
 
 # -----------------------------------------------------------------------------
 # 2. Create directories
@@ -42,6 +44,7 @@ install -m 755 "$SCRIPT_DIR/scripts/prune.sh"            /usr/local/lib/node-bac
 install -m 755 "$SCRIPT_DIR/scripts/pg-dump-all.sh"      /usr/local/lib/node-backup/pg-dump-all.sh
 install -m 755 "$SCRIPT_DIR/scripts/mariadb-dump-all.sh" /usr/local/lib/node-backup/mariadb-dump-all.sh
 install -m 644 "$SCRIPT_DIR/scripts/lib.sh"              /usr/local/lib/node-backup/lib.sh
+install -m 755 "$SCRIPT_DIR/scripts/node-backup-restic"  /usr/local/sbin/node-backup-restic
 
 # -----------------------------------------------------------------------------
 # 4. Install configuration file (only on first install — never overwrite)
@@ -81,6 +84,68 @@ NOTIFY_SCHEDULE="${NOTIFY_SCHEDULE:-*-*-* 09:00:00}"
 PRUNE_SCHEDULE="${PRUNE_SCHEDULE:-Sun *-*-* 04:30:00}"
 BACKUP_MEMORY_MAX="${BACKUP_MEMORY_MAX:-1500M}"
 PRUNE_MEMORY_MAX="${PRUNE_MEMORY_MAX:-2G}"
+BACKUP_TIMEOUT="${BACKUP_TIMEOUT:-12h}"
+PRUNE_TIMEOUT="${PRUNE_TIMEOUT:-24h}"
+RESTIC_VERSION="${RESTIC_VERSION:-latest}"
+
+# -----------------------------------------------------------------------------
+# 6b. Install restic from the official GitHub release (SHA256-verified)
+# -----------------------------------------------------------------------------
+install_restic() {
+  local arch ver current tmp file
+  case "$(uname -m)" in
+    x86_64)        arch=amd64 ;;
+    aarch64|arm64) arch=arm64 ;;
+    armv7l|armv6l) arch=arm ;;
+    i386|i686)     arch=386 ;;
+    *) echo "ERROR: unsupported architecture $(uname -m)"; return 1 ;;
+  esac
+
+  if [[ "$RESTIC_VERSION" == "latest" ]]; then
+    # Follow the /releases/latest redirect to .../tag/vX.Y.Z (no API token needed)
+    ver="$(curl -fsSLI -o /dev/null -w '%{url_effective}' \
+      https://github.com/restic/restic/releases/latest)" || return 1
+    ver="${ver##*/v}"
+  else
+    ver="${RESTIC_VERSION#v}"
+  fi
+  [[ "$ver" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "ERROR: could not determine restic version (got '$ver')"; return 1; }
+
+  current="$(/usr/local/bin/restic version 2>/dev/null | awk '{print $2}')" || true
+  if [[ "$current" == "$ver" ]]; then
+    echo ">> restic $ver already installed"
+    return 0
+  fi
+
+  echo ">> Installing restic $ver (${current:+upgrading from $current, }linux/$arch)..."
+  tmp="$(mktemp -d)"
+  file="restic_${ver}_linux_${arch}.bz2"
+  if ! curl -fsSL -o "$tmp/$file"      "https://github.com/restic/restic/releases/download/v${ver}/${file}" \
+     || ! curl -fsSL -o "$tmp/SHA256SUMS" "https://github.com/restic/restic/releases/download/v${ver}/SHA256SUMS"; then
+    rm -rf "$tmp"; echo "ERROR: download failed"; return 1
+  fi
+  if ! (cd "$tmp" && grep " ${file}\$" SHA256SUMS | sha256sum -c --quiet -); then
+    rm -rf "$tmp"; echo "ERROR: restic checksum verification FAILED — not installing"; return 1
+  fi
+  bunzip2 "$tmp/$file"
+  install -m 755 "$tmp/${file%.bz2}" /usr/local/bin/restic
+  rm -rf "$tmp"
+  /usr/local/bin/restic version
+}
+
+if ! install_restic; then
+  if [[ -x /usr/local/bin/restic ]]; then
+    echo "WARNING: restic install/upgrade failed — keeping existing $(/usr/local/bin/restic version)"
+  else
+    echo "ERROR: restic could not be installed and none is present. Aborting."
+    exit 1
+  fi
+fi
+
+if dpkg -s restic &>/dev/null; then
+  echo "NOTE: the distro 'restic' package is also installed (/usr/bin/restic)."
+  echo "      /usr/local/bin/restic takes precedence. Remove it with: apt-get remove restic"
+fi
 
 echo ">> Applying configuration:"
 echo "   BACKUP_SCHEDULE        = $BACKUP_SCHEDULE"
@@ -89,6 +154,8 @@ echo "   NOTIFY_SCHEDULE        = $NOTIFY_SCHEDULE"
 echo "   PRUNE_SCHEDULE         = $PRUNE_SCHEDULE"
 echo "   BACKUP_MEMORY_MAX      = $BACKUP_MEMORY_MAX"
 echo "   PRUNE_MEMORY_MAX       = $PRUNE_MEMORY_MAX"
+echo "   BACKUP_TIMEOUT         = $BACKUP_TIMEOUT"
+echo "   PRUNE_TIMEOUT          = $PRUNE_TIMEOUT"
 
 # -----------------------------------------------------------------------------
 # 7. Install systemd units with config substituted
@@ -99,11 +166,13 @@ install -m 644 "$SCRIPT_DIR/systemd/node-backup-notify.service" /etc/systemd/sys
 
 sed \
   -e "s|%%BACKUP_MEMORY_MAX%%|${BACKUP_MEMORY_MAX}|g" \
+  -e "s|%%BACKUP_TIMEOUT%%|${BACKUP_TIMEOUT}|g" \
   "$SCRIPT_DIR/systemd/node-backup.service" \
   > /etc/systemd/system/node-backup.service
 
 sed \
   -e "s|%%PRUNE_MEMORY_MAX%%|${PRUNE_MEMORY_MAX}|g" \
+  -e "s|%%PRUNE_TIMEOUT%%|${PRUNE_TIMEOUT}|g" \
   "$SCRIPT_DIR/systemd/node-backup-prune.service" \
   > /etc/systemd/system/node-backup-prune.service
 
@@ -129,6 +198,11 @@ chmod 644 \
   /etc/systemd/system/node-backup-prune.service \
   /etc/systemd/system/node-backup-prune.timer \
   /etc/systemd/system/node-backup-notify.timer
+
+if grep -l '%%[A-Z_]*%%' /etc/systemd/system/node-backup*.service /etc/systemd/system/node-backup*.timer 2>/dev/null; then
+  echo "ERROR: unreplaced placeholders in the systemd units listed above"
+  exit 1
+fi
 
 systemctl daemon-reload
 
@@ -161,7 +235,13 @@ echo "  3. Test a manual run:"
 echo "       sudo systemctl start node-backup.service"
 echo "       sudo journalctl -u node-backup.service -n 200 --no-pager"
 echo
-echo "  4. Enable the timers:"
+echo "  4. Verify you can list snapshots and restore:"
+echo "       sudo node-backup-restic snapshots"
+echo
+echo "  5. Store RESTIC_PASSWORD and rclone.conf OUTSIDE this node (password manager)."
+echo "     Without them the backups cannot be restored if this node is lost."
+echo
+echo "  6. Enable the timers:"
 echo "       sudo systemctl enable --now node-backup.timer"
 echo "       sudo systemctl enable --now node-backup-notify.timer"
 echo "       sudo systemctl enable --now node-backup-prune.timer"
