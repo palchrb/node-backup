@@ -103,7 +103,7 @@ dump_docker_container() {
     return 0
   fi
 
-  pg_user="$(echo "$env_block" | grep '^POSTGRES_USER=' | cut -d= -f2- | head -1)"
+  pg_user="$(echo "$env_block" | grep '^POSTGRES_USER=' | cut -d= -f2- | awk 'NR==1')"
   pg_user="${pg_user:-postgres}"
 
   log "pg-dump: dumping container $name (image: $image, user: $pg_user)"

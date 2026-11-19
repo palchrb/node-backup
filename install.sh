@@ -188,12 +188,12 @@ install_rclone() {
   unzip -q "$tmp/$file" -d "$tmp"
   install -m 755 "$tmp/$base/rclone" /usr/local/bin/rclone
   rm -rf "$tmp"
-  /usr/local/bin/rclone version | head -1
+  /usr/local/bin/rclone version 2>/dev/null | awk 'NR==1'
 }
 
 if ! install_rclone; then
   if [[ -x /usr/local/bin/rclone ]]; then
-    echo "WARNING: rclone install/upgrade failed — keeping existing $(/usr/local/bin/rclone version | head -1)"
+    echo "WARNING: rclone install/upgrade failed — keeping existing $(/usr/local/bin/rclone version 2>/dev/null | awk 'NR==1')"
   else
     echo "ERROR: rclone could not be installed and none is present. Aborting."
     exit 1
